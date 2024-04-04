@@ -17,7 +17,7 @@
 import Foundation
 
 #if canImport(Network)
-    import Network
+import Network
 #endif
 
 @_implementationOnly import LiveKitWebRTC
@@ -27,7 +27,7 @@ class Engine: Loggable {
 
     public typealias ConditionEvalFunc = (_ newState: State, _ oldState: State?) -> Bool
 
-    struct State: Equatable {
+    struct State {
         var connectOptions: ConnectOptions
         var url: String?
         var token: String?
@@ -38,10 +38,10 @@ class Engine: Loggable {
         var disconnectError: LiveKitError?
         var connectStopwatch = Stopwatch(label: "connect")
         var hasPublished: Bool = false
-    }
 
-    let primaryTransportConnectedCompleter = AsyncCompleter<Void>(label: "Primary transport connect", defaultTimeOut: .defaultTransportState)
-    let publisherTransportConnectedCompleter = AsyncCompleter<Void>(label: "Publisher transport connect", defaultTimeOut: .defaultTransportState)
+        let primaryTransportConnectedCompleter = AsyncCompleter<Void>(label: "Primary transport connect", defaultTimeOut: .defaultTransportState)
+        let publisherTransportConnectedCompleter = AsyncCompleter<Void>(label: "Publisher transport connect", defaultTimeOut: .defaultTransportState)
+    }
 
     public var _state: StateSync<State>
 
@@ -70,8 +70,8 @@ class Engine: Loggable {
     lazy var subscriberDataChannel: DataChannelPairActor = .init(onDataPacket: { [weak self] dataPacket in
         guard let self else { return }
         switch dataPacket.value {
-        case let .speaker(update): self._delegate.notifyAsync { await $0.engine(self, didUpdateSpeakers: update.speakers) }
-        case let .user(userPacket): self._delegate.notifyAsync { await $0.engine(self, didReceiveUserPacket: userPacket) }
+        case let .speaker(update): self._delegate.notifyDetached { await $0.engine(self, didUpdateSpeakers: update.speakers) }
+        case let .user(userPacket): self._delegate.notifyDetached { await $0.engine(self, didReceiveUserPacket: userPacket) }
         default: return
         }
     })
@@ -104,7 +104,7 @@ class Engine: Loggable {
                 self.log("connectionState: \(oldState.connectionState) -> \(newState.connectionState), reconnectMode: \(String(describing: newState.isReconnectingWithMode))")
             }
 
-            self._delegate.notifyAsync { await $0.engine(self, didMutateState: newState, oldState: oldState) }
+            self._delegate.notifyDetached { await $0.engine(self, didMutateState: newState, oldState: oldState) }
 
             // execution control
             self._blockProcessQueue.async { [weak self] in
@@ -128,7 +128,7 @@ class Engine: Loggable {
     }
 
     deinit {
-        log()
+        log(nil, .trace)
     }
 
     // Connect sequence, resets existing state
@@ -211,18 +211,19 @@ class Engine: Loggable {
 
             let publisher = try requirePublisher()
 
-            if !publisher.isConnected, publisher.connectionState != .connecting {
+            let connectionState = await publisher.connectionState
+            if connectionState != .connected, connectionState != .connecting {
                 try await publisherShouldNegotiate()
             }
 
-            try await publisherTransportConnectedCompleter.wait()
+            try await _state.publisherTransportConnectedCompleter.wait()
             try await publisherDataChannel.openCompleter.wait()
         }
 
         try await ensurePublisherConnected()
 
         // At this point publisher should be .connected and dc should be .open
-        if !(publisher?.isConnected ?? false) {
+        if await !(publisher?.isConnected ?? false) {
             log("publisher is not .connected", .error)
         }
 
@@ -329,13 +330,6 @@ extension Engine {
 // MARK: - Execution control (Internal)
 
 extension Engine {
-    func executeIfConnected(_ block: @escaping @convention(block) () -> Void) {
-        if case .connected = _state.connectionState {
-            // execute immediately
-            block()
-        }
-    }
-
     func execute(when condition: @escaping ConditionEvalFunc,
                  removeWhen removeCondition: @escaping ConditionEvalFunc,
                  _ block: @escaping () -> Void)
@@ -393,7 +387,7 @@ extension Engine {
         await signalClient.resumeQueues()
 
         // Wait for transport...
-        try await primaryTransportConnectedCompleter.wait()
+        try await _state.primaryTransportConnectedCompleter.wait()
         try Task.checkCancellation()
 
         _state.mutate { $0.connectStopwatch.split(label: "engine") }
@@ -452,8 +446,7 @@ extension Engine {
 
             log("[Connect] Waiting for subscriber to connect...")
             // Wait for primary transport to connect (if not already)
-            try await primaryTransportConnectedCompleter.wait()
-            log("[Connect] Subscriber.connectionState: \(String(describing: subscriber?.connectionState.description))")
+            try await _state.primaryTransportConnectedCompleter.wait()
             try Task.checkCancellation()
 
             // send SyncState before offer
@@ -465,7 +458,7 @@ extension Engine {
                 // Only if published, wait for publisher to connect...
                 log("[Connect] Waiting for publisher to connect...")
                 try await publisher.createAndSendOffer(iceRestart: true)
-                try await publisherTransportConnectedCompleter.wait()
+                try await _state.publisherTransportConnectedCompleter.wait()
             }
         }
 
@@ -559,8 +552,8 @@ extension Engine {
             return
         }
 
-        let previousAnswer = subscriber.localDescription
-        let previousOffer = subscriber.remoteDescription
+        let previousAnswer = await subscriber.localDescription
+        let previousOffer = await subscriber.remoteDescription
 
         // 1. autosubscribe on, so subscribed tracks = all tracks - unsub tracks,
         //    in this case, we send unsub tracks, so server add all tracks to this

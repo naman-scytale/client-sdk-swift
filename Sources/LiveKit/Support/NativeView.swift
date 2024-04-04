@@ -17,56 +17,56 @@
 import Foundation
 
 #if canImport(UIKit)
-    import UIKit
+import UIKit
 #elseif canImport(AppKit)
-    import AppKit
+import AppKit
 #endif
 
 #if os(iOS)
-    public typealias NativeViewType = UIView
+public typealias NativeViewType = UIView
 #elseif os(macOS)
-    public typealias NativeViewType = NSView
+public typealias NativeViewType = NSView
 #endif
 
 /// A simple abstraction of a View that is native to the platform.
 /// When built for iOS this will be a UIView.
 /// When built for macOS this will be a NSView.
-public class NativeView: NativeViewType {
-    override init(frame: CGRect) {
+open class NativeView: NativeViewType {
+    override public init(frame: CGRect) {
         super.init(frame: frame)
     }
 
     @available(*, unavailable)
-    required init?(coder _: NSCoder) {
+    public required init?(coder _: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
     #if os(iOS)
-        override public func layoutSubviews() {
-            super.layoutSubviews()
-            performLayout()
-        }
+    override public func layoutSubviews() {
+        super.layoutSubviews()
+        performLayout()
+    }
     #else
-        override public func layout() {
-            super.layout()
-            performLayout()
-        }
+    override public func layout() {
+        super.layout()
+        performLayout()
+    }
     #endif
 
     #if os(macOS)
-        // for compatibility with macOS
-        func setNeedsLayout() {
-            needsLayout = true
-        }
+    // for compatibility with macOS
+    public func setNeedsLayout() {
+        needsLayout = true
+    }
     #endif
 
     #if os(macOS)
-        func bringSubviewToFront(_ view: NSView) {
-            addSubview(view)
-        }
+    public func bringSubviewToFront(_ view: NSView) {
+        addSubview(view)
+    }
     #endif
 
-    func performLayout() {
+    open func performLayout() {
         //
     }
 }

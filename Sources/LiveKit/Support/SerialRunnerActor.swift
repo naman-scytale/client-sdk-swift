@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 LiveKit
+ * Copyright 2024 LiveKit
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,4 +14,23 @@
  * limitations under the License.
  */
 
-#include <unistd.h>
+import Foundation
+
+actor SerialRunnerActor<Value: Sendable> {
+    private var previousTask: Task<Value, Error>?
+
+    func run(block: @Sendable @escaping () async throws -> Value) async throws -> Value {
+        let task = Task { [previousTask] in
+            let _ = try? await previousTask?.value
+            return try await block()
+        }
+
+        previousTask = task
+
+        return try await withTaskCancellationHandler {
+            try await task.value
+        } onCancel: {
+            task.cancel()
+        }
+    }
+}

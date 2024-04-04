@@ -18,10 +18,10 @@ import Combine
 import Foundation
 
 @dynamicMemberLookup
-final class StateSync<State> {
+public final class StateSync<State> {
     // MARK: - Types
 
-    typealias OnDidMutate = (_ newState: State, _ oldState: State) -> Void
+    public typealias OnDidMutate = (_ newState: State, _ oldState: State) -> Void
 
     // MARK: - Public
 
@@ -35,7 +35,6 @@ final class StateSync<State> {
     private var _state: State
     private let _lock = UnfairLock()
     private var _onDidMutate: OnDidMutate?
-    private let _onDidMutateQueue = DispatchQueue(label: "LiveKit.StateSync")
 
     public init(_ state: State, onDidMutate: OnDidMutate? = nil) {
         _state = state
@@ -50,10 +49,11 @@ final class StateSync<State> {
             let result = try block(&_state)
             let newState = _state
 
-            // Always invoke onDidMutate
-            _onDidMutateQueue.async {
-                self.onDidMutate?(newState, oldState)
-            }
+            // Always invoke onDidMutate within the lock (sync) since
+            // logic following the state mutation may depend on this.
+            // Invoke on async queue within _onDidMutate if necessary.
+            _onDidMutate?(newState, oldState)
+
             return result
         }
     }
@@ -75,7 +75,7 @@ final class StateSync<State> {
 }
 
 extension StateSync: CustomStringConvertible {
-    var description: String {
+    public var description: String {
         "StateSync(\(String(describing: copy()))"
     }
 }
