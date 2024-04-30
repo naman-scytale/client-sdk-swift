@@ -32,6 +32,8 @@ public class Room: NSObject, ObservableObject, Loggable {
     internal let queue = DispatchQueue(label: "LiveKitSDK.room", qos: .default)
 
     // MARK: - Public
+    @objc
+    public var appstate: String = "FOREGROUND"
 
     @objc
     public var sid: Sid? { _state.sid }
@@ -393,7 +395,7 @@ internal extension Room {
 extension Room: AppStateDelegate {
 
     func appDidEnterBackground() {
-
+        self.appstate = "BACKGROUND"
         guard _state.options.suspendLocalVideoTracksInBackground else { return }
 
         guard let localParticipant = localParticipant else { return }
@@ -407,6 +409,8 @@ extension Room: AppStateDelegate {
     }
 
     func appWillEnterForeground() {
+        self.appstate = "FOREGROUND"
+        let cameraVideoTracks = localParticipant.localVideoTracks.filter { $0.source == .camera }
 
         guard let localParticipant = localParticipant else { return }
         let promises = localParticipant.localVideoTracks.filter { $0.source == .camera }.map { $0.resume() }
@@ -419,6 +423,7 @@ extension Room: AppStateDelegate {
     }
 
     func appWillTerminate() {
+        self.appstate = ""
         // attempt to disconnect if already connected.
         // this is not guranteed since there is no reliable way to detect app termination.
         disconnect()
