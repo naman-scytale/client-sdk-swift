@@ -410,7 +410,7 @@ extension Room: AppStateDelegate {
 
     func appWillEnterForeground() {
         self.appstate = "FOREGROUND"
-        let cameraVideoTracks = localParticipant.localVideoTracks.filter { $0.source == .camera }
+        let cameraVideoTracks = localParticipant?.localVideoTracks.filter { $0.source == .camera }
 
         guard let localParticipant = localParticipant else { return }
         let promises = localParticipant.localVideoTracks.filter { $0.source == .camera }.map { $0.resume() }
