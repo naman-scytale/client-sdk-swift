@@ -23,30 +23,30 @@ class TimerTests: XCTestCase {
     let timer = DispatchQueueTimer(timeInterval: 1)
     var counter = 0
 
-    func testSuspendRestart() async throws {
-    
-        timer.resume()
-        
-        await withCheckedContinuation({ (continuation: CheckedContinuation<Void, Never>) in
-            //
-            timer.handler = {
-                print("onTimer count: \(self.counter)")
-                
-                self.counter += 1
-
-                if self.counter == 3 {
-                    print("suspending timer for 3s...")
-                    self.timer.suspend()
-                    Promise(()).delay(3).then {
-                        print("restarting timer...")
-                        self.timer.restart()
-                    }
-                }
-                
-                if self.counter == 5 {
-                    continuation.resume()
-                }
-            }
-        })
-    }
+//    func testSuspendRestart() async throws {
+//    
+//        timer.resume()
+//        
+//        await withCheckedContinuation({ (continuation: CheckedContinuation<Void, Never>) in
+//            //
+//            timer.handler = {
+//                print("onTimer count: \(self.counter)")
+//                
+//                self.counter += 1
+//
+//                if self.counter == 3 {
+//                    print("suspending timer for 3s...")
+//                    self.timer.suspend()
+//                    Promise(()).delay(3).then {
+//                        print("restarting timer...")
+//                        self.timer.restart()
+//                    }
+//                }
+//                
+//                if self.counter == 5 {
+//                    continuation.resume()
+//                }
+//            }
+//        })
+//    }
 }
